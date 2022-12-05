@@ -40,7 +40,7 @@ brlm <- function(
   else if ( class(control) != "brlm.control" )
     stop("control parameter must be specified through brlm.control")
   ##  - tau.sq
-  if ( !is.null(tau.sq) && any(tau.sq) <= 0 )
+  if ( !is.null(tau.sq) && any(tau.sq <= 0) )
     stop("Prior variance tau.sq must be >= 0")
   ## Formula parsing idiom from lm()
   cl <- match.call()
