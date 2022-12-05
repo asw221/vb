@@ -1,0 +1,6 @@
+
+
+PKG_LIBS = `$(R_HOME)/bin/Rscript --vanilla -e "Rcpp:::LdFlags()"`
+PKG_CXXFLAGS = -Wall -pedantic -std=c++17 -I../inst/include
+## PKG_CXXFLAGS = -DNDEBUG -DEIGEN_DONT_VECTORIZE
+

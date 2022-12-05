@@ -1,0 +1,15 @@
+
+# Ignore tests (temporary)
+tests
+tests/*
+
+# Ignore temporaries
+*~
+src/*~
+inst/include/*~
+
+# Ignore Mac specific files
+.DS_Store
+
+# Ignore any .Rhistory-ies
+.Rhistory

@@ -1,0 +1,5 @@
+
+
+## PKG_LIBS = `$(R_HOME)/bin/Rscript --vanilla -e "Rcpp:::LdFlags()"`
+PKG_CPPFLAGS = -Wall -pedantic -std=c++17 -I../inst/include
+

@@ -1,0 +1,20 @@
+
+useDynLib(vb, .registration = TRUE)
+
+import( RcppEigen )
+importFrom( Rcpp, sourceCpp )
+
+
+export( brlm )
+export( brlm.control )
+export( brlm.fit )
+export( loocv )
+
+
+S3method( loocv, brlm )
+S3method( print, brlm )
+S3method( print, summary.brlm )
+S3method( sigma, brlm )
+S3method( summary, brlm )
+S3method( vcov, brlm )
+
