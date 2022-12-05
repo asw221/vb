@@ -11,6 +11,7 @@ export( brlm.fit )
 export( loocv )
 
 
+S3method( logLik, brlm )
 S3method( loocv, brlm )
 S3method( print, brlm )
 S3method( print, summary.brlm )

@@ -192,10 +192,22 @@ sigma.brlm <- function(object, ...) {
   object$sigma
 }
 
+logLik.brlm <- function(object, ...) {
+  res <- residuals(object)
+  p <- length(coef(object))  # approximate
+  n <- length(res)
+  val <- sum(dt(res, object$nu, log = TRUE))
+  attr(val, "nall") <- n
+  attr(val, "nobs") <- n - p
+  attr(val, "df") <- p
+  class(val) <- "logLik"
+  val
+}
+
 
 loocv.brlm <- function(object, ...) {
   y <- model.response(object$model)
-  x <- model.matrix(object$model)
+  x <- model.matrix(object$terms, object$model)
   n <- length(y)
   sigma.sq <- sigma(object)^2
   scl <- (object$nu + 1) / (object$nu * sigma.sq)
