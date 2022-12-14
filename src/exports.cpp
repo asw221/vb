@@ -41,7 +41,7 @@ extern "C" {
     // 		<< delta
     // 		<< "\n" << std::endl;
     //
-    vb::optim_base::result msg = opt.optimize( model, ctrl );
+    vb::optim_base::result res = opt.optimize( model, ctrl );
     //
     return Rcpp::wrap(
       Rcpp::List::create(
@@ -50,8 +50,8 @@ extern "C" {
 	Rcpp::Named("sigma") = model.sigma(),
 	Rcpp::Named("weights") = model.weights(),
 	Rcpp::Named("deriv") = model.gradient(),
-	Rcpp::Named("converged") = msg.flag == vb::optim_base::flag::none,
-	Rcpp::Named("iter") = msg.iter,
+	Rcpp::Named("converged") = res.flag == vb::optim_base::flag::none,
+	Rcpp::Named("iter") = res.iter,
 	Rcpp::Named("tau.sq") = data.tausq(),
 	Rcpp::Named("nu") = data.nu(),
 	Rcpp::Named("mu0") = data.mu(),
