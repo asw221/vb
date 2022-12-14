@@ -162,41 +162,6 @@ brlm.fit0 <- function(x, y, theta, tau.sq, nu, mu0, control) {
 }
 
 
-brlm.fit0.irwls <- function(x, y, theta, tau.sq, nu, mu0, control) {
-  sigma.sq <- var(c( y - x %*% theta ))
-  w <- rep(1, length(y))
-  z <- y
-  theta0 <- theta
-  converged <- FALSE
-  i <- 0
-  while ( i < control$maxit && !converged ) {
-    V <- solve( t(x * w) %*% x + diag(1 / tau.sq) )
-    theta <- V %*% c(t(x) %*% (w * z) - mu0 / tau.sq)
-    eta <- c( x %*% theta )
-    r <- y - eta
-    sigma.sq <- var(r)
-    w <-  -(nu + 1) * (r^2 - nu * sigma.sq) / (nu * sigma.sq + r^2)^2
-    z <- eta + (nu + 1) * r / (nu * sigma.sq + r^2) / w
-    delta <- theta - theta0
-    theta0 <- theta
-    i <- i + 1
-    converged <- sum( delta^2 ) <= control$xtol
-  }
-  list(
-    coefficients = theta,
-    vcov = V,
-    sigma = sqrt(sigma.sq),
-    weights = w,
-    ## deriv = d$deriv,
-    converged = converged,
-    iter = i,
-    tau.sq = tau.sq,
-    nu = nu,
-    mu0 = mu0,
-    residuals = r,
-    fitted.values = eta
-  )
-}
 
 
 
