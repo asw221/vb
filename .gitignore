@@ -3,6 +3,10 @@
 tests
 tests/*
 
+# Ignore object files
+src/*.o
+src/*.so
+
 # Ignore temporaries
 *~
 src/*~
