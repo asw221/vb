@@ -25,6 +25,9 @@ namespace vb {
     void update_sigma();
     
     scalar_type linear_update( const param_type& delta );
+    
+    /* Unnormalized log posterior */
+    scalar_type objective() const;
     scalar_type sigma() const { return std::sqrt(sigmasq_); };
     
     param_type fitted() const;
@@ -50,8 +53,10 @@ namespace vb {
 
 template< typename T >
 void vb::brlm<T>::initialize() {
+  const int scl = (data_.n() > data_.p()) ?
+    (data_.n() - data_.p()) : data_.n();
   beta_ = data_.start();
-  update_sigma();
+  sigmasq_ = residuals().squaredNorm() / scl;
 };
 
 
@@ -63,7 +68,24 @@ vb::brlm<T>::linear_update(
   assert( delta.size() == beta_.size() &&
 	  "Gradient dimension mismatch" );
   beta_ += delta;
+  update_sigma();
   return delta.norm();
+};
+
+
+
+template< typename T >
+typename vb::brlm<T>::scalar_type
+vb::brlm<T>::objective() const {
+  const scalar_type nu = data_.nu();
+  const scalar_type nusig = nu * sigmasq_;
+  const scalar_type llk = -data_.n()/2 * std::log(sigmasq_) +
+    -(nu+1)/2 * ( residuals().array().abs2() / nusig ).log1p().sum();
+  const scalar_type lp = -0.5 * (
+    data_.tausq().cwiseSqrt().cwiseInverse().asDiagonal() *
+    (beta_ - data_.mu())
+  ).squaredNorm();
+  return llk + lp;
 };
 
 
@@ -112,7 +134,8 @@ template< typename T >
 void vb::brlm<T>::update_sigma() {
   const int scl = (data_.n() > data_.p()) ?
     (data_.n() - data_.p()) : data_.n();
-  sigmasq_ = residuals().squaredNorm() / scl;
+  sigmasq_ = ( weights().cwiseSqrt().asDiagonal() * residuals() )
+    .squaredNorm() / scl;
 };
 
 
