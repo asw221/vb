@@ -1,6 +1,6 @@
 
 brlm.control <- function(
-  maxit = 50L,
+  maxit = 20L,
   tau = 1e4,
   xtol = 1e-5,
   xtol_rel = 1e-10,

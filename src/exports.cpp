@@ -17,7 +17,7 @@ extern "C" {
   ) {
     vb::glm_data<> data;
     vb::optim_base::control ctrl;
-    vb::newton opt;
+    vb::irwls opt;
     //
     vb::initialize_data_r_pointers(
       data, x_, y_, start_, prior_mean_, prior_variance_,
@@ -32,24 +32,14 @@ extern "C" {
     vb::brlm<> model(data);
     model.initialize();
     //
-    // Rcpp::Rcout << "start:\n" << data.start() << "\n\n"
-    // 		<< "gradient:\n" << model.gradient() << "\n\n"
-    // 		<< "-hessian:\n" << model.negative_hessian() << "\n\n"
-    // 		<< std::endl;
-    // vb::brlm<>::param_type delta = model.negative_hessian().ldlt().solve(model.gradient());
-    // Rcpp::Rcout << "delta:\n"
-    // 		<< delta
-    // 		<< "\n" << std::endl;
-    //
     vb::optim_base::result res = opt.optimize( model, ctrl );
     //
     return Rcpp::wrap(
       Rcpp::List::create(
         Rcpp::Named("coefficients") = model.beta(),
-	Rcpp::Named("vcov") = model.negative_hessian().inverse(),
+	Rcpp::Named("vcov") = model.vcov(),
 	Rcpp::Named("sigma") = model.sigma(),
 	Rcpp::Named("weights") = model.weights(),
-	Rcpp::Named("deriv") = model.gradient(),
 	Rcpp::Named("converged") = res.flag == vb::optim_base::flag::none,
 	Rcpp::Named("iter") = res.iter,
 	Rcpp::Named("tau.sq") = data.tausq(),

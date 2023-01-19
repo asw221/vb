@@ -3,6 +3,8 @@
 #include <cmath>
 
 #include <Eigen/Core>
+#include <Eigen/Dense>
+#include <Eigen/QR>
 
 #include "regression_data.hpp"
 
@@ -22,22 +24,31 @@ namespace vb {
     brlm( vb::glm_data<T>& d ) : data_(d) { ; }
 
     void initialize();
-    void update_sigma();
+    // void update_sigma();
     
-    scalar_type linear_update( const param_type& delta );
+    void update( const param_type& b );
     
     /* Unnormalized log posterior */
     scalar_type objective() const;
     scalar_type sigma() const { return std::sqrt(sigmasq_); };
     
     param_type fitted() const;
-    param_type gradient() const;
     param_type residuals() const;
     param_type weights() const;
 
-    matrix_type negative_hessian() const;
+    matrix_type vcov() const;
+    matrix_type information() const;
+
+    
+    const param_type& pseudo_data() const;
+    const matrix_type& x() const;
 
     const param_type& beta() const { return beta_; };
+    param_type& beta() {
+      return const_cast<param_type&>(
+        const_cast<const brlm<T>*>(this)->beta()
+      );
+    };
     
 
   protected:
@@ -61,15 +72,13 @@ void vb::brlm<T>::initialize() {
 
 
 template< typename T >
-typename vb::brlm<T>::scalar_type
-vb::brlm<T>::linear_update(
-  const vb::brlm<T>::param_type& delta
+void vb::brlm<T>::update(
+  const vb::brlm<T>::param_type& b
 ) {
-  assert( delta.size() == beta_.size() &&
-	  "Gradient dimension mismatch" );
-  beta_ += delta;
-  update_sigma();
-  return delta.norm();
+  assert(b.size() == beta_.size() && "Parameter dimension mismatch");
+  beta_ = b;
+  sigmasq_ = ( weights().array() * residuals().array().square() )
+    .sum() / data_.n();
 };
 
 
@@ -81,7 +90,7 @@ vb::brlm<T>::objective() const {
   const scalar_type nusig = nu * sigmasq_;
   const scalar_type llk = -data_.n()/2 * std::log(sigmasq_) +
     -(nu+1)/2 * ( residuals().array().abs2() / nusig ).log1p().sum();
-  const scalar_type lp = -0.5 * (
+  const scalar_type lp = -0.5 / sigmasq_ * (
     data_.tausq().cwiseSqrt().cwiseInverse().asDiagonal() *
     (beta_ - data_.mu())
   ).squaredNorm();
@@ -92,51 +101,13 @@ vb::brlm<T>::objective() const {
 template< typename T >
 typename vb::brlm<T>::param_type
 vb::brlm<T>::weights() const {
-  const scalar_type nusig = data_.nu() * sigmasq_;
-  param_type r2 = residuals().cwiseAbs2();
-  return ( r2.array() / nusig + 1 ).inverse().matrix();
+  return (data_.nu() + 1) *
+    ( data_.nu() + residuals().array().square() / sigmasq_ )
+    .inverse().matrix();
 };
 
 
 
-template< typename T >
-typename vb::brlm<T>::matrix_type
-vb::brlm<T>::negative_hessian() const {
-  const scalar_type nusig = data_.nu() * sigmasq_;
-  const scalar_type scl = (data_.nu() + 1) / nusig;
-  param_type r2 = residuals().cwiseAbs2();
-  param_type w = ( r2.array() / nusig + 1 ).inverse().matrix();
-  param_type dw = (2 / nusig) * (r2.asDiagonal() * w.cwiseAbs2());
-  matrix_type h = scl * data_.x().adjoint() *
-    (w + dw).asDiagonal() * data_.x();
-  h.diagonal() += ( sigmasq_ * data_.tausq() ).cwiseInverse();
-  return h;
-};
-
-
-template< typename T >
-typename vb::brlm<T>::param_type
-vb::brlm<T>::gradient() const {
-  const scalar_type nusig = data_.nu() * sigmasq_;
-  const scalar_type scl = (data_.nu() + 1) / nusig;
-  param_type r = residuals();
-  param_type g =
-    scl * ( data_.x().adjoint() * (weights().asDiagonal() * r) ) +
-    ( sigmasq_ * data_.tausq() ).cwiseInverse().asDiagonal() *
-    ( data_.mu() - beta_ );
-  return g;
-};
-
-
-
-
-template< typename T >
-void vb::brlm<T>::update_sigma() {
-  const int scl = (data_.n() > data_.p()) ?
-    (data_.n() - data_.p()) : data_.n();
-  sigmasq_ = ( weights().cwiseSqrt().asDiagonal() * residuals() )
-    .squaredNorm() / scl;
-};
 
 
 template< typename T >
@@ -147,10 +118,91 @@ vb::brlm<T>::fitted() const {
 
 
 template< typename T >
+const typename vb::brlm<T>::param_type&
+vb::brlm<T>::pseudo_data() const {
+  return data_.y();
+};
+
+template< typename T >
+const typename vb::brlm<T>::matrix_type&
+vb::brlm<T>::x() const {
+  return data_.x();
+};
+
+
+
+template< typename T >
 typename vb::brlm<T>::param_type
 vb::brlm<T>::residuals() const {
   return data_.y() - fitted();
 };
 
+
+template< typename T >
+typename vb::brlm<T>::matrix_type
+vb::brlm<T>::vcov() const {
+  const int p = data_.p();
+  const scalar_type nu = data_.nu();
+  Eigen::HouseholderQR<matrix_type> q( data_.x() );
+  matrix_type rinv = q.matrixQR()
+    .topLeftCorner(p, p)
+    .template triangularView<Eigen::Upper>()
+    .solve( matrix_type::Identity(p, p) );
+  return sigmasq_ * (nu + 3) / (nu + 1) * ( rinv * rinv.transpose() );
+};
+
+
+template< typename T >
+typename vb::brlm<T>::matrix_type
+vb::brlm<T>::information() const {
+  const scalar_type nu = data_.nu();
+  return (nu + 1) / (nu + 3) / sigmasq_ *
+    ( data_.x().transpose() * data_.x() );
+};
+
+
+
 #endif  // _VB_BRLM_
 
+
+
+
+
+
+
+// template< typename T >
+// typename vb::brlm<T>::matrix_type
+// vb::brlm<T>::negative_hessian() const {
+//   const int p = beta_.size();
+//   const scalar_type nusig = data_.nu() * sigmasq_;
+//   const scalar_type scl = (data_.nu() + 1) / nusig;
+//   param_type r2 = residuals().cwiseAbs2();
+//   param_type w = ( r2.array() / nusig + 1 ).inverse().matrix();
+//   param_type dw = (2 / nusig) * (r2.asDiagonal() * w.cwiseAbs2());
+//   matrix_type h( p+1, p+1 );
+//   h.topLeftCorner(p, p) = scl * data_.x().adjoint() *
+//     (w + dw).asDiagonal() * data_.x();
+//   h.diagonal().head(p) += ( sigmasq_ * data_.tausq() ).cwiseInverse();
+//   h(p, p) = (data_.nu() + 1) * 2 * nusig *
+//     ( r2.array() / (nusiig + r2.array()).square() ).sum();
+//   return h;
+// };
+
+
+// template< typename T >
+// typename vb::brlm<T>::param_type
+// vb::brlm<T>::gradient() const {
+//   const int p = beta_.size();
+//   const int n = data_.n();
+//   const scalar_type nusig = data_.nu() * sigmasq_;
+//   const scalar_type scl = (data_.nu() + 1) / nusig;
+//   param_type r = residuals();
+//   param_type g(p + 1);
+//   g.head(p) =
+//     scl * ( data_.x().adjoint() * (weights().asDiagonal() * r) ) +
+//     ( sigmasq_ * data_.tausq() ).cwiseInverse().asDiagonal() *
+//     ( data_.mu() - beta_ );
+//   g.tail(1) = -(n-1) + (data_.nu() + 1) *
+//     (r.array().square() / (nusig + r.array().square())).sum();
+//   return g;
+// };
