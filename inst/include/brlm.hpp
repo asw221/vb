@@ -76,8 +76,13 @@ void vb::brlm<T>::update(
   const vb::brlm<T>::param_type& b
 ) {
   assert(b.size() == beta_.size() && "Parameter dimension mismatch");
+  /* Need to save the weights beforehand to avoid beta and sigma being 
+   * updated using different weights within the same iteration: 
+   * weights() computes on the fly
+   */
+  param_type w = weights();
   beta_ = b;
-  sigmasq_ = ( weights().array() * residuals().array().square() )
+  sigmasq_ = ( w.array() * residuals().array().square() )
     .sum() / data_.n();
 };
 
