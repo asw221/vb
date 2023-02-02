@@ -2,9 +2,10 @@
 #include <cassert>
 #include <cmath>
 
+#include <Eigen/Cholesky>
 #include <Eigen/Core>
 #include <Eigen/Dense>
-#include <Eigen/QR>
+// #include <Eigen/QR>
 
 #include "regression_data.hpp"
 
@@ -25,8 +26,10 @@ namespace vb {
 
     void initialize();
     // void update_sigma();
-    
-    void update( const param_type& b );
+
+    /* Update method for any dispersion or kurtosis parameters */
+    void update_aux( const param_type& w );
+    void beta( const param_type& b );
     
     /* Unnormalized log posterior */
     scalar_type objective() const;
@@ -40,7 +43,8 @@ namespace vb {
     matrix_type information() const;
 
     
-    const param_type& pseudo_data() const;
+    param_type pseudo_data() const;
+    const param_type& prior_variance() const;
     const matrix_type& x() const;
 
     const param_type& beta() const { return beta_; };
@@ -72,16 +76,23 @@ void vb::brlm<T>::initialize() {
 
 
 template< typename T >
-void vb::brlm<T>::update(
+void vb::brlm<T>::beta(
   const vb::brlm<T>::param_type& b
 ) {
   assert(b.size() == beta_.size() && "Parameter dimension mismatch");
-  /* Need to save the weights beforehand to avoid beta and sigma being 
-   * updated using different weights within the same iteration: 
-   * weights() computes on the fly
-   */
-  param_type w = weights();
   beta_ = b;
+};
+
+
+template< typename T >
+void vb::brlm<T>::update_aux(
+  const vb::brlm<T>::param_type& w
+) {
+  assert(w.size() == data_.n() && "Weights dimension mismatch");
+  /* Need to save the weights beforehand to avoid scenario where beta 
+   * and sigma are updated using different weights within the same 
+   * iteration: weights() computes on the fly
+   */
   sigmasq_ = ( w.array() * residuals().array().square() )
     .sum() / data_.n();
 };
@@ -123,10 +134,18 @@ vb::brlm<T>::fitted() const {
 
 
 template< typename T >
-const typename vb::brlm<T>::param_type&
+typename vb::brlm<T>::param_type
 vb::brlm<T>::pseudo_data() const {
   return data_.y();
 };
+
+
+template< typename T >
+const typename vb::brlm<T>::param_type&
+vb::brlm<T>::prior_variance() const {
+  return data_.tausq();
+};
+
 
 template< typename T >
 const typename vb::brlm<T>::matrix_type&
@@ -147,13 +166,14 @@ template< typename T >
 typename vb::brlm<T>::matrix_type
 vb::brlm<T>::vcov() const {
   const int p = data_.p();
-  const scalar_type nu = data_.nu();
-  Eigen::HouseholderQR<matrix_type> q( data_.x() );
-  matrix_type rinv = q.matrixQR()
-    .topLeftCorner(p, p)
-    .template triangularView<Eigen::Upper>()
-    .solve( matrix_type::Identity(p, p) );
-  return sigmasq_ * (nu + 3) / (nu + 1) * ( rinv * rinv.transpose() );
+  // const scalar_type nu = data_.nu();
+  // Eigen::HouseholderQR<matrix_type> q( data_.x() );
+  // matrix_type rinv = q.matrixQR()
+  //   .topLeftCorner(p, p)
+  //   .template triangularView<Eigen::Upper>()
+  //   .solve( matrix_type::Identity(p, p) );
+  // return sigmasq_ * (nu + 3) / (nu + 1) * ( rinv * rinv.transpose() );
+  return information().llt().solve( matrix_type::Identity(p, p) );
 };
 
 
@@ -161,8 +181,12 @@ template< typename T >
 typename vb::brlm<T>::matrix_type
 vb::brlm<T>::information() const {
   const scalar_type nu = data_.nu();
-  return (nu + 1) / (nu + 3) / sigmasq_ *
+  // return (nu + 1) / (nu + 3) / sigmasq_ *
+  //   ( data_.x().transpose() * data_.x() );
+  matrix_type i = (nu + 1) / (nu + 3) / sigmasq_ *
     ( data_.x().transpose() * data_.x() );
+  i.diagonal() += data_.tausq().cwiseInverse();
+  return i;
 };
 
 
