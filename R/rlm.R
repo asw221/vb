@@ -209,6 +209,11 @@ logLik.brlm <- function(object, ...) {
 }
 
 
+model.matrix.brlm <- function(object, ...) {
+  model.matrix( object$terms, object$model )
+}
+
+
 loocv.brlm <- function(object, ...) {
   y <- model.response(object$model)
   x <- model.matrix(object$terms, object$model)

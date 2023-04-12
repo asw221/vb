@@ -9,10 +9,13 @@ export( brlm )
 export( brlm.control )
 export( brlm.fit )
 export( loocv )
+export( rcs )
 
 
 S3method( logLik, brlm )
 S3method( loocv, brlm )
+S3method( model.matrix, brlm )
+S3method( predict, rcs )
 S3method( print, brlm )
 S3method( print, summary.brlm )
 S3method( sigma, brlm )

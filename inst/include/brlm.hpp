@@ -43,7 +43,7 @@ namespace vb {
     matrix_type information() const;
 
     
-    param_type pseudo_data() const;
+    const param_type& pseudo_data() const;
     const param_type& prior_variance() const;
     const matrix_type& x() const;
 
@@ -134,7 +134,7 @@ vb::brlm<T>::fitted() const {
 
 
 template< typename T >
-typename vb::brlm<T>::param_type
+const typename vb::brlm<T>::param_type&
 vb::brlm<T>::pseudo_data() const {
   return data_.y();
 };
