@@ -15,6 +15,8 @@
 
 namespace vb {
 
+  // --- brlm --------------------------------------------------------
+  ////////////////////////////////////////////////////////////////////
   template< typename T = double >
   class brlm {
   public:
@@ -61,6 +63,7 @@ namespace vb {
 
     vb::glm_data<T>& data_;
   };
+  ////////////////////////////////////////////////////////////////////
   
 }
 
@@ -181,8 +184,6 @@ template< typename T >
 typename vb::brlm<T>::matrix_type
 vb::brlm<T>::information() const {
   const scalar_type nu = data_.nu();
-  // return (nu + 1) / (nu + 3) / sigmasq_ *
-  //   ( data_.x().transpose() * data_.x() );
   matrix_type i = (nu + 1) / (nu + 3) / sigmasq_ *
     ( data_.x().transpose() * data_.x() );
   i.diagonal() += data_.tausq().cwiseInverse();
@@ -199,39 +200,3 @@ vb::brlm<T>::information() const {
 
 
 
-// template< typename T >
-// typename vb::brlm<T>::matrix_type
-// vb::brlm<T>::negative_hessian() const {
-//   const int p = beta_.size();
-//   const scalar_type nusig = data_.nu() * sigmasq_;
-//   const scalar_type scl = (data_.nu() + 1) / nusig;
-//   param_type r2 = residuals().cwiseAbs2();
-//   param_type w = ( r2.array() / nusig + 1 ).inverse().matrix();
-//   param_type dw = (2 / nusig) * (r2.asDiagonal() * w.cwiseAbs2());
-//   matrix_type h( p+1, p+1 );
-//   h.topLeftCorner(p, p) = scl * data_.x().adjoint() *
-//     (w + dw).asDiagonal() * data_.x();
-//   h.diagonal().head(p) += ( sigmasq_ * data_.tausq() ).cwiseInverse();
-//   h(p, p) = (data_.nu() + 1) * 2 * nusig *
-//     ( r2.array() / (nusiig + r2.array()).square() ).sum();
-//   return h;
-// };
-
-
-// template< typename T >
-// typename vb::brlm<T>::param_type
-// vb::brlm<T>::gradient() const {
-//   const int p = beta_.size();
-//   const int n = data_.n();
-//   const scalar_type nusig = data_.nu() * sigmasq_;
-//   const scalar_type scl = (data_.nu() + 1) / nusig;
-//   param_type r = residuals();
-//   param_type g(p + 1);
-//   g.head(p) =
-//     scl * ( data_.x().adjoint() * (weights().asDiagonal() * r) ) +
-//     ( sigmasq_ * data_.tausq() ).cwiseInverse().asDiagonal() *
-//     ( data_.mu() - beta_ );
-//   g.tail(1) = -(n-1) + (data_.nu() + 1) *
-//     (r.array().square() / (nusig + r.array().square())).sum();
-//   return g;
-// };

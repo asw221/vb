@@ -41,7 +41,11 @@ namespace vb {
       target[0] = -std::numeric_limits<double>::infinity();
       do {
 	param_type g = m.gradient();
-	norms[0] = (double)m.linear_update(m.negative_hessian().llt().solve(g));
+	param_type delta = m.information().llt().solve(g);
+	m.beta( m.beta() + delta );
+	m.update_aux();
+	// norms[0] = (double)m.linear_update(m.negative_hessian().llt().solve(g));
+	norms[0] = delta.norm();
 	target[1] = (double)m.objective();
 	//
 	norms[1] = norms[0] / std::sqrt(g.squaredNorm() + eps);

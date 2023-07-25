@@ -13,7 +13,7 @@
 
 
 #ifndef _VB_IRWLS_
-#define _VB_NEWTON_RAPHSON_
+#define _VB_IRWLS_
 
 
 namespace vb {
@@ -97,5 +97,5 @@ namespace vb {
 
 }
 
-#endif  // _VB_NEWTON_RAPHSON_
+#endif  // _VB_IRWLS_
 

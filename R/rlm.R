@@ -1,31 +1,11 @@
 
-brlm.control <- function(
-  maxit = 20L,
-  tau = 1e4,
-  xtol = 1e-5,
-  xtol_rel = 1e-10,
-  ...
-) {
-  L <- list(...)
-  if ( length(L) ) {
-    warning("Unused parameters: ", paste(names(L), sep = ", "))
-  }
-  maxit <- abs(maxit[1L])
-  tau <- abs(tau[1L])
-  xtol <- abs(xtol[1L])
-  xtol_rel <- abs(xtol_rel[1L])
-  structure(
-    list( maxit = maxit, tau = tau, xtol = xtol, xtol_rel = xtol_rel),
-    class = "brlm.control"
-  )
-}
 
 
 #' Robust linear regression
 #'
 brlm <- function(
   formula, data, subset, na.action,
-  nu = 7, mu0 = NULL, tau.sq = NULL, start = NULL,
+  nu = 4, mu0 = NULL, tau.sq = NULL, start = NULL,
   control = NULL, contrasts = NULL, model = TRUE
 ) {
   ## Check inputs
@@ -36,12 +16,13 @@ brlm <- function(
     stop("Degrees of freedom parameter must be >= 1")
   ##  - control
   if ( is.null(control) )
-    control <- brlm.control()
-  else if ( class(control) != "brlm.control" )
-    stop("control parameter must be specified through brlm.control")
+    control <- bglm.control()
+  else if ( class(control) != "bglm.control" )
+    stop("control parameter must be specified through bglm.control")
   ##  - tau.sq
   if ( !is.null(tau.sq) && any(tau.sq <= 0) )
-    stop("Prior variance tau.sq must be >= 0")
+    stop("Prior scale tau.sq must be >= 0")
+  ##
   ## Formula parsing idiom from lm()
   cl <- match.call()
   mf <- match.call( expand.dots = FALSE )
@@ -53,12 +34,14 @@ brlm <- function(
   mf[[ 1L ]] <- quote(stats::model.frame)
   mf <- eval( mf, parent.frame() )
   mt <- attr(mf, "terms")
+  ##
+  ## Extract x and y
   y <- model.response(mf, "numeric")
   x <- if ( !is.empty.model(mt) ) model.matrix(mt, mf, contrasts)
        else NULL
   n <- NROW(y)
   ##
-  ## Initialize parameters if model is no-empty
+  ## Initialize parameters if model is non-empty
   if ( !is.null(x) ) {
     ##
     ## Prior mean mu0
@@ -67,19 +50,21 @@ brlm <- function(
     else if ( length(mu0) == 1L )
       mu0 <- rep(mu0, NCOL(x))
     else if ( length(mu0) != NCOL(x) ) {
-      msg <- sprintf("Prior mean mu0 given with length = %d, but should have length = %d",
-                     length(mu0), NCOL(x))
+      msg <- sprintf(
+        "Prior mean mu0 given with length = %d, but should have length = %d",
+        length(mu0), NCOL(x))
       stop(msg)
     }
     ##
     ## Prior variance tau^2
     if ( is.null(tau.sq) )
-      tau.sq <- rep(control$tau, NCOL(x))
+      tau.sq <- rep(control$tau.sq, NCOL(x))
     else if ( length(tau.sq) == 1L )
       tau.sq <- rep(tau.sq, NCOL(x))
     else if ( length(tau.sq) != NCOL(x) ) {
-      msg <- sprintf("Prior variance tau.sq given with length = %d, but should have length = %d",
-                     length(tau.sq), NCOL(x))
+      msg <- sprintf(
+        "Prior variance tau.sq given with length = %d, but should have length = %d",
+        length(tau.sq), NCOL(x))
       stop(msg)
     }
     ##
@@ -88,8 +73,9 @@ brlm <- function(
       start <- if ( NCOL(x) <= NROW(x) ) qr.solve(x, y)
                else numeric(NCOL(x))
     if ( length(start) != NCOL(x) ) {
-      msg <- sprintf("Starting value given with length = %d, but should have length = %d",
-                     length(start), NCOL(x))
+      msg <- sprintf(
+        "Starting value given with length = %d, but should have length = %d",
+        length(start), NCOL(x))
       stop(msg)
     }
   }
@@ -113,8 +99,9 @@ brlm <- function(
   res
 }
 
+
 brlm.fit <- function(x, y, theta, tau.sq, nu, mu0, control) {
-  stopifnot(is(control, "brlm.control"))
+  stopifnot(is(control, "bglm.control"))
   stopifnot(NROW(x) == length(y))
   stopifnot(NCOL(x) == length(theta))
   stopifnot(NCOL(x) == length(tau.sq))
@@ -134,13 +121,13 @@ brlm.fit <- function(x, y, theta, tau.sq, nu, mu0, control) {
 brlm.fit0 <- function(x, y, theta, tau.sq, nu, mu0, control) {
   sigma.sq <- var(c( y - x %*% theta ))
   converged <- FALSE
-  i <- 0
+  i <- 0L
   while ( i < control$maxit && !converged ) {
     d <- brlm.deriv(theta, y, x, sigma.sq, tau.sq, nu, mu0)
     delta <- c( solve(d$hess) %*% d$deriv )
     theta <- theta - delta
     sigma.sq <- var(c( y - x %*% theta ))
-    i <- i + 1
+    i <- i + 1L
     converged <- sum( delta^2 ) <= control$xtol
   }
   d <- brlm.deriv(theta, y, x, sigma.sq, tau.sq, nu, mu0)
@@ -184,6 +171,8 @@ brlm.deriv <- function(theta, y, x, sigma.sq, tau.sq, nu, mu0) {
 
 
 
+## --- Methods for "brlm" --------------------------------------------
+
 loocv <- function(object, ...) UseMethod( "loocv" )
 
 print.brlm <- stats:::print.lm
@@ -198,7 +187,7 @@ sigma.brlm <- function(object, ...) {
 
 logLik.brlm <- function(object, ...) {
   res <- residuals(object) / sigma(object)
-  p <- length(coef(object))  # approximate
+  p <- length(object$coefficients)  # approximate
   n <- length(res)
   val <- sum(dt(res, object$nu, log = TRUE)) - n * log(sigma(object))
   attr(val, "nall") <- n
@@ -206,6 +195,14 @@ logLik.brlm <- function(object, ...) {
   attr(val, "df") <- p
   class(val) <- "logLik"
   val
+}
+
+deviance.brlm <- function(object, ...) {
+  n <- nrow(object$model)
+  saturated.llk <- n * dt(0, object$nu, log = TRUE) -
+    n * log(sigma(object))
+  fitted.llk <- as.numeric(logLik(object))
+  2 * (saturated.llk - fitted.llk)
 }
 
 
@@ -245,6 +242,7 @@ summary.brlm <- function(object, ...) {
       coefficiets = NULL,
       df = NULL,
       deviance = NULL,
+      null.deviance = NULL,
       r.squared = NULL
     ),
     class = "summary.brlm"
@@ -256,8 +254,18 @@ summary.brlm <- function(object, ...) {
     "t value" = coef(object) / se
   )
   rownames(res$coefficients) <- names(coef(object))
-  res$r.squared = 1 - var(residuals(object))^2 /
-    var(model.response(object$model))
+  ##
+  ## Compute R^2, deviance
+  p <- length(object$coefficients)  # approximate
+  n <- nrow(object$model)
+  res$df <- c( p, n - p )
+  y <- model.response(object$model)  # Null model
+  nu <- object$nu
+  fit0 <- brlm(y ~ 1, nu = nu)
+  res$r.squared = 1 - sigma(object)^2 / sigma(fit0)^2
+  res$deviance <- deviance(object)
+  res$null.deviance <- deviance(fit0)
+  ##
   res
 }
 
@@ -271,10 +279,10 @@ print.summary.brlm <- function(x, digits = 3L, ...) {
   print(rq, digits = digits)
   cat("\n")
   printCoefmat(x$coefficients, digits = digits)
-  cat("\nResidual standard error: ",
+  cat("\nResidual standard error:",
       formatC(x$sigma, digits = digits),
-      "on __ degrees of freedom\n")
-  cat("R-squared: ", formatC(x$r.squared, digits = digits), "\n")
+      "on", x$df[2L], "degrees of freedom\n")
+  cat("R-squared:", formatC(x$r.squared, digits = digits), "\n")
   invisible(x)
 }
 
