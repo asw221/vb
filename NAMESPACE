@@ -19,8 +19,15 @@ S3method( predict, rcs )
 
 
 ## --- S3 Methods for class 'blr' ------------------------------------
-S3method( summary, blr )
-S3method( vcov, blr )
+S3method( deviance, blr )
+S3method( model.matrix, blr )  ## <-
+S3method( print, blr )    ## <-
+S3method( residuals, blr )    ## <- ?
+S3method( summary, blr )  ## <-
+S3method( vcov, blr )     ## <-
+S3method( logLik, blr )
+
+S3method( print, summary.blr )  ## <-
 
 
 ## --- S3 Methods for class 'brlm' -----------------------------------
@@ -29,9 +36,10 @@ S3method( logLik, brlm )
 S3method( loocv, brlm )
 S3method( model.matrix, brlm )
 S3method( print, brlm )
-S3method( print, summary.brlm )
 S3method( sigma, brlm )
 S3method( summary, brlm )
 S3method( vcov, brlm )
+
+S3method( print, summary.brlm )
 
 

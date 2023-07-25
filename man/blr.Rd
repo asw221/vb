@@ -15,7 +15,8 @@ blr(
   start = NULL,
   control = NULL,
   contrasts = NULL,
-  model = TRUE
+  model = TRUE,
+  maxit = NULL
 )
 }
 \description{

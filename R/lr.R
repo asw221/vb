@@ -6,7 +6,8 @@
 blr <- function(
   formula, data, subset, na.action,
   nu = 1, mu0 = NULL, tau.sq = NULL, start = NULL,
-  control = NULL, contrasts = NULL, model = TRUE
+  control = NULL, contrasts = NULL, model = TRUE,
+  maxit = NULL
 ) {
   ## Check inputs
   ##  - nu
@@ -19,6 +20,8 @@ blr <- function(
     control <- bglm.control()
   else if ( class(control) != "bglm.control" )
     stop("control parameter must be specified through bglm.control")
+  if ( !is.null(maxit) )
+    control$maxit <- as.integer(abs(maxit[1L]))
   ##  - tau.sq
   if ( !is.null(tau.sq) && any(tau.sq <= 0) )
     stop("Prior scale tau.sq must be >= 0")
@@ -121,7 +124,7 @@ blr.fit <- function(x, y, theta, tau.sq, nu, mu0, control) {
 
 
 
-## --- Methods for "brlm" --------------------------------------------
+## --- Methods for "blr" ---------------------------------------------
 
 print.blr <- stats:::print.lm
 
@@ -137,11 +140,11 @@ model.matrix.blr <- function(object, ...) {
 
 
 logLik.blr <- function(object, ...) {
-  y <- model.response(object$model)
+  y <- model.response(object$model, "numeric")
   mu <- fitted(object)
   p <- length(object$coefficients)  # approximate
-  n <- length(res)
-  val <- y * log(mu) + (1 - y) * log1p(-mu)
+  n <- length(mu)
+  val <- sum( y * log(mu) + (1 - y) * log1p(-mu) )
   attr(val, "nall") <- n
   attr(val, "nobs") <- n - p
   attr(val, "df") <- p
@@ -150,12 +153,28 @@ logLik.blr <- function(object, ...) {
 }
 
 deviance.blr <- function(object, ...) {
-  fitted.llk <- as.numeric(logLik(object))
-  -2 * fitted.llk
+  -2 * as.numeric(logLik(object))
 }
 
 
-
+residuals.blr <- function(
+  object,
+  type = c("deviance", "response"), ...
+) {
+  ## Other residual types:
+  ## "deviance", "pearson", "working", "response", "partial"
+  type <- match.arg( type )
+  y <- model.response( object$model, "numeric" )
+  mu <- fitted(object)
+  if ( type == "deviance" ) {
+    sign(y - 0.5) *
+      sqrt( -2 * (y * log(mu) + (1 - y) * log1p(-mu)) )
+  } else if ( type == "response" ) {
+    y - mu
+  } else {
+    rep(NA, length(y))
+  }
+}
 
 
 
@@ -164,20 +183,22 @@ summary.blr <- function(object, ...) {
     list(
       call = object$call,
       terms = object$terms,
+      family = NULL,
       cov.scaled = vcov(object),
       coefficiets = NULL,
+      deviance.resid = NULL,
+      dispersion = NULL,
       df = NULL,
       deviance = NULL,
-      null.deviance = NULL,
-      r.squared = NULL
+      null.deviance = NULL
     ),
-    class = "summary.brlm"
+    class = "summary.blr"
   )
   se <- sqrt(diag(vcov(object)))
   res$coefficients <- cbind(
     "Estimate" = coef(object),
     "Std. Error" = se,
-    "t value" = coef(object) / se
+    "z value" = coef(object) / se
   )
   rownames(res$coefficients) <- names(coef(object))
   ##
@@ -185,31 +206,33 @@ summary.blr <- function(object, ...) {
   p <- length(object$coefficients)  # approximate
   n <- nrow(object$model)
   res$df <- c( p, n - p )
-  ## y <- model.response(object$model)  # Null model
-  ## nu <- object$nu
-  ## fit0 <- brlm(y ~ 1, nu = nu)
+  y <- model.response(object$model, "numeric")  # Null model
+  nu <- object$nu
+  fit0 <- blr(y ~ 1, nu = nu, mu0 = object$mu0[1L],
+              tau.sq = object$tau.sq[1L], maxit = object$iter)
   res$deviance <- deviance(object)
-  ## res$null.deviance <- deviance(fit0)
+  res$null.deviance <- deviance(fit0)
+  res$deviance.resid <- residuals(object, type = "deviance")
+  res$dispersion <- 1
   ##
   res
 }
 
 
-## print.summary.blr <- function(x, digits = 3L, ...) {
-##   cat("\nCall:\n", paste(deparse(x$call), sep = "\n", collapse = "\n"),
-##       "\n\n", sep = "")
-##   cat("Residuals:\n")
-##   rq <- structure(zapsmall(quantile(x$residuals)),
-##                   names = c("Min", "1Q", "Median", "3Q", "Max"))
-##   print(rq, digits = digits)
-##   cat("\n")
-##   printCoefmat(x$coefficients, digits = digits)
-##   cat("\nResidual standard error:",
-##       formatC(x$sigma, digits = digits),
-##       "on", x$df[2L], "degrees of freedom\n")
-##   cat("R-squared:", formatC(x$r.squared, digits = digits), "\n")
-##   invisible(x)
-## }
+print.summary.blr <- function(x, digits = 3L, ...) {
+  cat("\nCall:\n", paste(deparse(x$call), sep = "\n", collapse = "\n"),
+      "\n\n", sep = "")
+  cat("Deviance Residuals:\n")
+  rq <- structure(zapsmall(quantile(x$deviance.resid)),
+                  names = c("Min", "1Q", "Median", "3Q", "Max"))
+  print(rq, digits = digits)
+  cat("\n")
+  printCoefmat(x$coefficients, digits = digits)
+  cat("\n(Dispersion parameter: ", x$dispersion, ")\n", sep = "")
+  cat("\nDeviance: ", x$deviance, " on ", x$df[1L],
+      " degrees of freedom\n", sep = "")
+  invisible(x)
+}
 
 
 
