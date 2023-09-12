@@ -159,7 +159,8 @@ deviance.blr <- function(object, ...) {
 
 residuals.blr <- function(
   object,
-  type = c("deviance", "response"), ...
+  type = c("deviance", "pearson", "response"),
+  ...
 ) {
   ## Other residual types:
   ## "deviance", "pearson", "working", "response", "partial"
@@ -171,6 +172,8 @@ residuals.blr <- function(
       sqrt( -2 * (y * log(mu) + (1 - y) * log1p(-mu)) )
   } else if ( type == "response" ) {
     y - mu
+  } else if ( type == "pearson" ) {
+    (y - mu) / sqrt(mu * (1 - mu))
   } else {
     rep(NA, length(y))
   }
@@ -231,6 +234,7 @@ print.summary.blr <- function(x, digits = 3L, ...) {
   cat("\n(Dispersion parameter: ", x$dispersion, ")\n", sep = "")
   cat("\nDeviance: ", x$deviance, " on ", x$df[1L],
       " degrees of freedom\n", sep = "")
+  cat("\n")
   invisible(x)
 }
 

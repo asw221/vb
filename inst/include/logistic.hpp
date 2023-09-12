@@ -131,7 +131,7 @@ vb::blr<T>::fitted() const {
   param_type mu = linear_predictor();
   for ( int i = 0; i < mu.size(); i++ ) {
     scalar_type e_eta = std::exp( -mu[i] );
-    mu[i] = e_eta / (1 + e_eta);
+    mu[i] = 1 / (1 + e_eta);
   }
   return mu;
 };

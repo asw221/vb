@@ -238,6 +238,7 @@ summary.brlm <- function(object, ...) {
       terms = object$terms,
       residuals = residuals(object),
       sigma = sigma(object),
+      nu = object$nu,
       cov.scaled = vcov(object),
       coefficiets = NULL,
       df = NULL,
@@ -279,10 +280,12 @@ print.summary.brlm <- function(x, digits = 3L, ...) {
   print(rq, digits = digits)
   cat("\n")
   printCoefmat(x$coefficients, digits = digits)
+  rse <- if (x$nu <= 2) Inf else sqrt(x$nu / (x$nu - 2)) * x$sigma
   cat("\nResidual standard error:",
-      formatC(x$sigma, digits = digits),
+      formatC(rse, digits = digits),
       "on", x$df[2L], "degrees of freedom\n")
   cat("R-squared:", formatC(x$r.squared, digits = digits), "\n")
+  cat("\n")
   invisible(x)
 }
 
